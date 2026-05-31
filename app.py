@@ -34,8 +34,8 @@ def resolve_user_emails(user_ids: list[str]) -> list[str]:
 
 
 def _send_auth_prompt(client, channel_id: str, user_id: str):
-    """未認証ユーザーに認証手順を送る。"""
-    auth_url = auth.start_oauth_manual(user_id)
+    """未認証ユーザーに認証ボタンを送る。"""
+    auth_url = auth.start_oauth(user_id)
     client.chat_postEphemeral(
         channel=channel_id,
         user=user_id,
@@ -45,14 +45,7 @@ def _send_auth_prompt(client, channel_id: str, user_id: str):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": (
-                        "🔐 *初回認証が必要です*\n\n"
-                        "① 下のボタンをクリックして Google で認証\n"
-                        "② ブラウザに「*このサイトにアクセスできません*」が出たら OK\n"
-                        "③ ブラウザの *URL バーをまるごとコピー*\n"
-                        "④ 以下のコマンドを実行:\n"
-                        "`/日程調整-認証 コピーしたURL`"
-                    ),
+                    "text": "🔐 *初回認証が必要です*\n下のボタンをクリックして Google アカウントを連携してください。",
                 },
             },
             {
