@@ -1,0 +1,38 @@
+name: 日程調整ボット
+
+on:
+  schedule:
+    - cron: '0 0,5,10,15,20 * * *'  # 5時間ごとに起動
+  workflow_dispatch:  # 手動でも起動できる
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 290  # 4時間50分で終了 → 次のcronが引き継ぐ
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 依存パッケージをインストール
+        run: pip install -r requirements.txt
+
+      - name: credentials.json を復元
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > credentials.json
+
+      - name: トークンファイルを復元
+        run: python scripts/import_tokens.py
+        env:
+          TOKENS_JSON: ${{ secrets.TOKENS_JSON }}
+
+      - name: ボットを起動
+        run: python app.py
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_APP_TOKEN: ${{ secrets.SLACK_APP_TOKEN }}
+          GOOGLE_CREDENTIALS_FILE: credentials.json
+          OAUTH_REDIRECT_URI: ${{ secrets.OAUTH_REDIRECT_URI }}
+          SKIP_OAUTH_SERVER: 'true'
