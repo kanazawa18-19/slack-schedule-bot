@@ -1,0 +1,9 @@
+.env
+credentials.json
+tokens/
+user_settings/
+*.pickle
+__pycache__/
+*.pyc
+.DS_Store
+settings.json
