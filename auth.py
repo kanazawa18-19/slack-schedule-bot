@@ -92,7 +92,6 @@ def start_oauth(user_id: str) -> str:
     )
     auth_url, state = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
         prompt="consent",
     )
     _pending[state] = {"user_id": user_id, "flow": flow}
