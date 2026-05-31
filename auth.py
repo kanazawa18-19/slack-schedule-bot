@@ -10,7 +10,7 @@ from google.auth.transport.requests import Request
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 TOKENS_DIR = os.environ.get("TOKENS_DIR", "tokens")
-REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "http://localhost:8080/oauth/callback")
+REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI") or "http://localhost:8080/oauth/callback"
 MANUAL_REDIRECT_URI = "http://localhost"
 
 Path(TOKENS_DIR).mkdir(exist_ok=True)
