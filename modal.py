@@ -324,7 +324,7 @@ def build_modal(channel_id: str, user_id: str) -> dict:
                 "element": {
                     "type": "static_select",
                     "action_id": "value",
-                    "initial_option": {"text": {"type": "plain_text", "text": "30分刻み"}, "value": "30"},
+                    "initial_option": {"text": {"type": "plain_text", "text": "30分刻み（14:00 / 14:30 / 15:00 …）"}, "value": "30"},
                     "options": [
                         {"text": {"type": "plain_text", "text": "15分刻み（14:00 / 14:15 / 14:30 …）"}, "value": "15"},
                         {"text": {"type": "plain_text", "text": "30分刻み（14:00 / 14:30 / 15:00 …）"}, "value": "30"},
@@ -371,6 +371,7 @@ def build_modal(channel_id: str, user_id: str) -> dict:
                     "action_id": "value",
                     "initial_option": {
                         "text": {"type": "plain_text", "text": "指定キーワードのみ除外"},
+                        "description": {"type": "plain_text", "text": "商談・面談・面接・MTG・ブロック・有給・午前休・午後休 を含む予定"},
                         "value": "keywords",
                     },
                     "options": [
@@ -401,9 +402,9 @@ def build_modal(channel_id: str, user_id: str) -> dict:
                     "type": "radio_buttons",
                     "action_id": "value",
                     "initial_option": (
-                        {"text": {"type": "plain_text", "text": "空き枠まとめ形式"}, "value": "windows"}
+                        {"text": {"type": "plain_text", "text": "空き枠まとめ形式"}, "description": {"type": "plain_text", "text": "14:00〜16:00（この間で1時間 自由に調整可）と空き窓を提示"}, "value": "windows"}
                         if saved_display == "windows"
-                        else {"text": {"type": "plain_text", "text": "スロット形式"}, "value": "slots"}
+                        else {"text": {"type": "plain_text", "text": "スロット形式"}, "description": {"type": "plain_text", "text": "14:00〜15:00 / 14:15〜15:15 … と個別に列挙"}, "value": "slots"}
                     ),
                     "options": [
                         {
