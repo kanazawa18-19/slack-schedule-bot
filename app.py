@@ -34,8 +34,8 @@ def resolve_user_emails(user_ids: list[str]) -> list[str]:
 
 
 def _send_auth_prompt(client, channel_id: str, user_id: str):
-    """未認証ユーザーに認証ボタンを送る。"""
-    auth_url = auth.start_oauth(user_id)
+    """未認証ユーザーに認証手順を送る。"""
+    auth_url = auth.start_oauth_manual(user_id)
     client.chat_postEphemeral(
         channel=channel_id,
         user=user_id,
@@ -45,7 +45,14 @@ def _send_auth_prompt(client, channel_id: str, user_id: str):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "🔐 *初回認証が必要です*\n下のボタンをクリックして Google アカウントを連携してください。",
+                    "text": (
+                        "🔐 *初回認証が必要です*\n\n"
+                        "① 下のボタンをクリックして Google で認証\n"
+                        "② ブラウザに「*このサイトにアクセスできません*」が出たら OK\n"
+                        "③ ブラウザの *URL バーをまるごとコピー*\n"
+                        "④ 以下のコマンドを実行:\n"
+                        "`/日程調整-認証 コピーしたURL`"
+                    ),
                 },
             },
             {
@@ -88,6 +95,23 @@ def handle_schedule(ack, client, body, command):
 @app.action("open_auth_url")
 def handle_open_auth_url(ack):
     ack()
+
+
+@app.command("/日程調整-認証")
+def handle_auth_code(ack, respond, command):
+    ack()
+    user_id = command["user_id"]
+    raw = command.get("text", "").strip()
+
+    if not raw:
+        respond("⚠️ URLを貼り付けてください。例: `/日程調整-認証 http://localhost/?code=xxxx`")
+        return
+
+    try:
+        auth.exchange_code(user_id, raw)
+        respond("✅ Google カレンダーとの認証が完了しました。`/日程調整` を実行してください。")
+    except Exception as e:
+        respond(f"❌ 認証に失敗しました。もう一度 `/日程調整` からやり直してください。\n`{str(e)}`")
 
 
 # ---------------------------------------------------------------------------
