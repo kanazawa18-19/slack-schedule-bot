@@ -518,8 +518,7 @@ def handle_settings_modal_submit(ack, body, view):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    if os.environ.get("SKIP_OAUTH_SERVER") != "true":
-        import web
-        threading.Thread(target=web.run, kwargs={"port": int(os.environ.get("PORT", 8080))}, daemon=True).start()
+    import web
+    threading.Thread(target=web.run, kwargs={"port": int(os.environ.get("PORT", 8080))}, daemon=True).start()
     handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
     handler.start()
