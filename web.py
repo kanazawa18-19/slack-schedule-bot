@@ -19,7 +19,11 @@ def oauth_callback():
     if not code or not state:
         return "<h1>エラー</h1><p>認証情報が不正です</p>", 400
 
-    user_id = auth.complete_oauth(state, code)
+    try:
+        user_id = auth.complete_oauth(state, code)
+    except Exception as e:
+        return f"<h1>認証エラー</h1><pre>{e}</pre><p>もう一度 /日程調整 を実行してください。</p>", 500
+
     if not user_id:
         return "<h1>エラー</h1><p>セッションが切れました。もう一度 /日程調整 を実行してください。</p>", 400
 
