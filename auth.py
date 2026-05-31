@@ -15,7 +15,7 @@ MANUAL_REDIRECT_URI = "http://localhost"
 
 Path(TOKENS_DIR).mkdir(exist_ok=True)
 
-_pending: dict[str, str] = {}
+_pending: dict[str, dict] = {}  # state -> {"user_id": str, "flow": Flow}
 
 
 def get_token_path(user_id: str) -> str:
@@ -95,22 +95,18 @@ def start_oauth(user_id: str) -> str:
         include_granted_scopes="true",
         prompt="consent",
     )
-    _pending[state] = user_id
+    _pending[state] = {"user_id": user_id, "flow": flow}
     return auth_url
 
 
 def complete_oauth(state: str, code: str) -> str | None:
     """Web コールバック処理（ローカル開発用）。"""
-    user_id = _pending.pop(state, None)
-    if not user_id:
+    pending = _pending.pop(state, None)
+    if not pending:
         return None
 
-    flow = Flow.from_client_secrets_file(
-        os.environ.get("GOOGLE_CREDENTIALS_FILE", "credentials.json"),
-        scopes=SCOPES,
-        redirect_uri=REDIRECT_URI,
-        state=state,
-    )
+    user_id = pending["user_id"]
+    flow = pending["flow"]
     flow.fetch_token(code=code)
 
     with open(get_token_path(user_id), "wb") as f:
