@@ -214,16 +214,15 @@ def handle_mention(event, client):
             else:
                 blocks = build_schedule_blocks(results, session_id)
 
-            client.chat_postEphemeral(
+            client.chat_postMessage(
                 channel=channel_id,
-                user=user_id,
                 thread_ts=thread_ts,
                 blocks=blocks,
                 text="日程調整",
             )
 
         except Exception as e:
-            client.chat_postEphemeral(channel=channel_id, user=user_id,
+            client.chat_postMessage(channel=channel_id,
                 thread_ts=thread_ts,
                 text=f"❌ エラーが発生しました: {str(e)}")
 
@@ -292,7 +291,7 @@ def handle_modal_submit(ack, body, client, view):
             )
 
             if not results:
-                client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, text="❌ 条件に合う空き時間が見つかりませんでした。")
+                client.chat_postMessage(channel=channel_id, thread_ts=thread_ts, text="❌ 条件に合う空き時間が見つかりませんでした。")
                 return
 
             # ── 直接登録モード（スロット形式のみ） ──
@@ -300,16 +299,12 @@ def handle_modal_submit(ack, body, client, view):
                 from calendar_utils import create_event, format_slot
                 event_url, mtg_url = create_event(user_id, direct_title, results[0][0], results[0][1], participants)
                 slot_str = format_slot(results[0][0], results[0][1])
-                confirm = f"✅ *カレンダーに登録しました*\n• {slot_str}  <{event_url}|カレンダーで確認>"
+                msg = f"📅 *{direct_title}*\n• {slot_str}  <{event_url}|カレンダーで確認>"
                 if mtg_url:
-                    confirm += f"  <{mtg_url}|MTGに参加>"
-                client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, text=confirm)
+                    msg += f"\n  🔗 <{mtg_url}|MTG URL>"
                 mention_str = " ".join(f"<@{uid}>" for uid in raw_user_ids) if raw_user_ids else "なし"
-                ch_msg = f"📅 *{direct_title}*\n• {slot_str}  <{event_url}|カレンダーで確認>"
-                if mtg_url:
-                    ch_msg += f"\n  🔗 <{mtg_url}|MTG URL>"
-                ch_msg += f"\n参加者: {mention_str}"
-                client.chat_postMessage(channel=channel_id, thread_ts=thread_ts, text=ch_msg)
+                msg += f"\n参加者: {mention_str}"
+                client.chat_postMessage(channel=channel_id, thread_ts=thread_ts, text=msg)
                 return
 
             # ── チェックボックス表示 ──
@@ -342,10 +337,10 @@ def handle_modal_submit(ack, body, client, view):
             else:
                 blocks = build_schedule_blocks(results, session_id)
 
-            client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, blocks=blocks, text="日程調整")
+            client.chat_postMessage(channel=channel_id, thread_ts=thread_ts, blocks=blocks, text="日程調整")
 
         except Exception as e:
-            client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, text=f"❌ エラー: {str(e)}")
+            client.chat_postMessage(channel=channel_id, thread_ts=thread_ts, text=f"❌ エラー: {str(e)}")
 
     threading.Thread(target=process).start()
 

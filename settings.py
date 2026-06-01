@@ -22,7 +22,7 @@ DEFAULT: dict = {
         "ブロック", "有給", "午前休", "午後休",
     ],
     "ignore_keywords": ["準備", "前準備"],
-    "filter_mode": "keywords",
+    "filter_mode": "all",
     "display_mode": "slots",
     # モーダルのデフォルト値
     "default_duration": 60,
