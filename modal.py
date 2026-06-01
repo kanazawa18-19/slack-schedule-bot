@@ -425,6 +425,29 @@ def build_modal(channel_id: str, user_id: str, thread_ts: str = "") -> dict:
                     ],
                 },
             },
+            # ── 除外曜日 ──
+            {
+                "type": "input",
+                "block_id": "exclude_weekdays",
+                "label": {"type": "plain_text", "text": "🚫 除外する曜日"},
+                "optional": True,
+                "element": _weekday_checkboxes(s["exclude_weekdays"]),
+            },
+            # ── 除外時間帯 ──
+            {
+                "type": "input",
+                "block_id": "exclude_time_ranges",
+                "label": {"type": "plain_text", "text": "🕐 除外する時間帯"},
+                "hint": {"type": "plain_text", "text": "1行につき1つ。例: 12:00-13:00"},
+                "optional": True,
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "value",
+                    "multiline": True,
+                    "placeholder": {"type": "plain_text", "text": "12:00-13:00\n17:30-18:30"},
+                    **({"initial_value": "\n".join(f"{r['start']}-{r['end']}" for r in s["exclude_time_ranges"])} if s["exclude_time_ranges"] else {}),
+                },
+            },
             # ── 表示形式 ──
             {
                 "type": "input",

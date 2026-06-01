@@ -241,9 +241,17 @@ def handle_mention(event, client):
 
 @app.view("schedule_modal")
 def handle_modal_submit(ack, body, client, view):
+    values = view["state"]["values"]
+
+    excl_tr_raw = ((values.get("exclude_time_ranges") or {}).get("value") or {}).get("value") or ""
+    for line in excl_tr_raw.splitlines():
+        line = line.strip()
+        if line and not re.fullmatch(r"\d{1,2}:\d{2}-\d{1,2}:\d{2}", line):
+            ack(response_action="errors", errors={"exclude_time_ranges": "HH:MM-HH:MM 形式で1行ずつ入力してください（例: 12:00-13:00）"})
+            return
+
     ack()
 
-    values = view["state"]["values"]
     metadata = json.loads(view.get("private_metadata", "{}"))
     channel_id = metadata.get("channel_id")
     thread_ts = metadata.get("thread_ts") or None
@@ -259,6 +267,16 @@ def handle_modal_submit(ack, body, client, view):
     interval_minutes = int(values["slot_interval"]["value"]["selected_option"]["value"])
 
     display_mode = values["display_mode"]["value"]["selected_option"]["value"]
+
+    excl_wd = (values.get("exclude_weekdays") or {}).get("value") or {}
+    exclude_weekdays_modal = sorted(int(o["value"]) for o in (excl_wd.get("selected_options") or []))
+
+    exclude_time_ranges_modal = []
+    for line in excl_tr_raw.splitlines():
+        line = line.strip()
+        if "-" in line:
+            start, _, end = line.partition("-")
+            exclude_time_ranges_modal.append({"start": start.strip(), "end": end.strip()})
 
     direct_block = values.get("direct_event_title", {}).get("value") or {}
     direct_title = (direct_block.get("value") or "").strip()
@@ -285,9 +303,9 @@ def handle_modal_submit(ack, body, client, view):
                 duration_minutes=duration,
                 buffer_minutes=buffer_minutes,
                 fixed_blocks=s["fixed_blocks"],
-                exclude_weekdays=s["exclude_weekdays"],
+                exclude_weekdays=exclude_weekdays_modal,
                 exclude_dates=s["exclude_dates"],
-                exclude_time_ranges=s["exclude_time_ranges"],
+                exclude_time_ranges=exclude_time_ranges_modal,
                 participants=participants,
                 block_keywords=s["block_keywords"],
                 ignore_keywords=s["ignore_keywords"],
@@ -334,6 +352,8 @@ def handle_modal_submit(ack, body, client, view):
                     "buffer_minutes": buffer_minutes,
                     "filter_mode": filter_mode,
                     "display_mode": display_mode,
+                    "exclude_weekdays": exclude_weekdays_modal,
+                    "exclude_time_ranges": exclude_time_ranges_modal,
                 },
             }
 

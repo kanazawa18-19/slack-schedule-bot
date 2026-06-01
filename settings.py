@@ -63,6 +63,8 @@ def save_modal_defaults(user_id: str, values: dict) -> None:
         "buffer_minutes": values.get("buffer_minutes", s["buffer_minutes"]),
         "filter_mode": values.get("filter_mode", s["filter_mode"]),
         "display_mode": values.get("display_mode", s["display_mode"]),
+        "exclude_weekdays": values.get("exclude_weekdays", s["exclude_weekdays"]),
+        "exclude_time_ranges": values.get("exclude_time_ranges", s["exclude_time_ranges"]),
     })
     save(user_id, s)
 
