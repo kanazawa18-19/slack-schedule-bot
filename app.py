@@ -564,6 +564,19 @@ def handle_settings_modal_submit(ack, body, view):
     s["default_weeks_ahead"] = int(values["default_weeks_ahead"]["value"]["selected_option"]["value"])
     s["filter_mode"] = values["filter_mode"]["value"]["selected_option"]["value"]
     s["display_mode"] = values["display_mode"]["value"]["selected_option"]["value"]
+
+    excl_wd = (values.get("exclude_weekdays") or {}).get("value") or {}
+    s["exclude_weekdays"] = sorted(int(o["value"]) for o in (excl_wd.get("selected_options") or []))
+
+    excl_tr_raw = ((values.get("exclude_time_ranges") or {}).get("value") or {}).get("value") or ""
+    ranges = []
+    for line in excl_tr_raw.splitlines():
+        line = line.strip()
+        if "-" in line:
+            start, _, end = line.partition("-")
+            ranges.append({"start": start.strip(), "end": end.strip()})
+    s["exclude_time_ranges"] = ranges
+
     cfg.save(user_id, s)
 
 

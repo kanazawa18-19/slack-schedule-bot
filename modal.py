@@ -16,7 +16,7 @@ def _weeks_opts() -> list:
 
 
 def _buffer_opts() -> list:
-    return [_sel("なし", "0"), _sel("15分", "15"), _sel("30分", "30")]
+    return [_sel("なし", "0"), _sel("15分", "15"), _sel("30分", "30"), _sel("1時間", "60")]
 
 
 def _interval_opts() -> list:
@@ -25,6 +25,15 @@ def _interval_opts() -> list:
         _sel("30分刻み（14:00 / 14:30 / 15:00 …）", "30"),
         _sel("1時間刻み（14:00 / 15:00 / 16:00 …）", "60"),
     ]
+
+
+def _weekday_checkboxes(exclude_weekdays: list) -> dict:
+    weekday_names = ["月", "火", "水", "木", "金"]
+    options = [{"text": {"type": "plain_text", "text": name}, "value": str(i)} for i, name in enumerate(weekday_names)]
+    element = {"type": "checkboxes", "action_id": "value", "options": options}
+    if exclude_weekdays:
+        element["initial_options"] = [{"text": {"type": "plain_text", "text": weekday_names[d]}, "value": str(d)} for d in exclude_weekdays]
+    return element
 
 
 def build_settings_modal(user_id: str) -> dict:
@@ -153,7 +162,7 @@ def build_settings_modal(user_id: str) -> dict:
                     "type": "static_select",
                     "action_id": "value",
                     "initial_option": _sel(
-                        {0: "なし", 15: "15分", 30: "30分"}.get(s["buffer_minutes"], "なし"),
+                        {0: "なし", 15: "15分", 30: "30分", 60: "1時間"}.get(s["buffer_minutes"], "なし"),
                         str(s["buffer_minutes"]),
                     ),
                     "options": _buffer_opts(),
@@ -173,6 +182,29 @@ def build_settings_modal(user_id: str) -> dict:
                 },
             },
             {"type": "divider"},
+            # 除外曜日
+            {
+                "type": "input",
+                "block_id": "exclude_weekdays",
+                "label": {"type": "plain_text", "text": "🚫 除外する曜日"},
+                "optional": True,
+                "element": _weekday_checkboxes(s["exclude_weekdays"]),
+            },
+            # 除外時間帯
+            {
+                "type": "input",
+                "block_id": "exclude_time_ranges",
+                "label": {"type": "plain_text", "text": "🕐 除外する時間帯"},
+                "hint": {"type": "plain_text", "text": "1行につき1つ。例: 12:00-13:00"},
+                "optional": True,
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "value",
+                    "multiline": True,
+                    "placeholder": {"type": "plain_text", "text": "12:00-13:00\n17:30-18:30"},
+                    **({"initial_value": "\n".join(f"{r['start']}-{r['end']}" for r in s["exclude_time_ranges"])} if s["exclude_time_ranges"] else {}),
+                },
+            },
             # 除外モード
             {
                 "type": "input",
