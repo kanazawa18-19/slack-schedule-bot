@@ -78,6 +78,35 @@ def handle_schedule(ack, client, body, command):
         _send_auth_prompt(client, channel_id, user_id)
         return
 
+    s = cfg.load(user_id)
+    filter_labels = {"keywords": "キーワード除外", "all": "全予定除外", "none": "除外なし"}
+    display_labels = {"slots": "スロット形式", "windows": "空き枠まとめ形式"}
+    dur_labels = {30: "30分", 60: "1時間", 90: "1時間30分", 120: "2時間"}
+    buf_labels = {0: "なし", 15: "15分", 30: "30分"}
+    client.chat_postEphemeral(
+        channel=channel_id,
+        user=user_id,
+        text="現在の検索条件",
+        blocks=[
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"⚙️ *現在の検索条件*\n"
+                        f"• 所要時間: {dur_labels.get(s['default_duration'], str(s['default_duration'])+'分')}\n"
+                        f"• 検索期間: {s['default_weeks_ahead']}週間先まで\n"
+                        f"• 時間帯: {s['default_start_time']}〜{s['default_end_time']}\n"
+                        f"• 刻み: {s['default_slot_interval']}分\n"
+                        f"• バッファ: {buf_labels.get(s['buffer_minutes'], str(s['buffer_minutes'])+'分')}\n"
+                        f"• 除外モード: {filter_labels.get(s['filter_mode'], s['filter_mode'])}\n"
+                        f"• 表示形式: {display_labels.get(s['display_mode'], s['display_mode'])}"
+                    ),
+                },
+            }
+        ],
+    )
+
     from modal import build_modal
     client.views_open(
         trigger_id=body["trigger_id"],
