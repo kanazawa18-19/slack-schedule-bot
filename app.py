@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import threading
 import uuid
 from dotenv import load_dotenv
@@ -83,6 +84,9 @@ def handle_schedule(ack, client, body, command):
     display_labels = {"slots": "スロット形式", "windows": "空き枠まとめ形式"}
     dur_labels = {30: "30分", 60: "1時間", 90: "1時間30分", 120: "2時間"}
     buf_labels = {0: "なし", 15: "15分", 30: "30分"}
+    weekday_names = ["月", "火", "水", "木", "金"]
+    excl_wd_str = "、".join(weekday_names[d] + "曜" for d in s["exclude_weekdays"]) if s["exclude_weekdays"] else "なし"
+    excl_tr_str = "、".join(f"{r['start']}〜{r['end']}" for r in s["exclude_time_ranges"]) if s["exclude_time_ranges"] else "なし"
     result = client.chat_postMessage(
         channel=channel_id,
         text="現在の検索条件",
@@ -99,7 +103,9 @@ def handle_schedule(ack, client, body, command):
                         f"• 刻み: {s['default_slot_interval']}分\n"
                         f"• バッファ: {buf_labels.get(s['buffer_minutes'], str(s['buffer_minutes'])+'分')}\n"
                         f"• 除外モード: {filter_labels.get(s['filter_mode'], s['filter_mode'])}\n"
-                        f"• 表示形式: {display_labels.get(s['display_mode'], s['display_mode'])}"
+                        f"• 表示形式: {display_labels.get(s['display_mode'], s['display_mode'])}\n"
+                        f"• 除外曜日: {excl_wd_str}\n"
+                        f"• 除外時間帯: {excl_tr_str}"
                     ),
                 },
             }
@@ -550,10 +556,18 @@ def handle_settings(ack, client, body, command):
 
 
 @app.view("settings_modal")
-def handle_settings_modal_submit(ack, body, view):
-    ack()
-    user_id = body["user"]["id"]
+def handle_settings_modal_submit(ack, body, client, view):
     values = view["state"]["values"]
+    user_id = body["user"]["id"]
+
+    excl_tr_raw = ((values.get("exclude_time_ranges") or {}).get("value") or {}).get("value") or ""
+    for line in excl_tr_raw.splitlines():
+        line = line.strip()
+        if line and not re.fullmatch(r"\d{1,2}:\d{2}-\d{1,2}:\d{2}", line):
+            ack(response_action="errors", errors={"exclude_time_ranges": "HH:MM-HH:MM 形式で1行ずつ入力してください（例: 12:00-13:00）"})
+            return
+
+    ack()
 
     s = cfg.load(user_id)
     s["default_duration"] = int(values["default_duration"]["value"]["selected_option"]["value"])
@@ -568,7 +582,6 @@ def handle_settings_modal_submit(ack, body, view):
     excl_wd = (values.get("exclude_weekdays") or {}).get("value") or {}
     s["exclude_weekdays"] = sorted(int(o["value"]) for o in (excl_wd.get("selected_options") or []))
 
-    excl_tr_raw = ((values.get("exclude_time_ranges") or {}).get("value") or {}).get("value") or ""
     ranges = []
     for line in excl_tr_raw.splitlines():
         line = line.strip()
@@ -578,6 +591,14 @@ def handle_settings_modal_submit(ack, body, view):
     s["exclude_time_ranges"] = ranges
 
     cfg.save(user_id, s)
+
+    weekday_names = ["月", "火", "水", "木", "金"]
+    wd_str = "、".join(weekday_names[d] + "曜" for d in s["exclude_weekdays"]) or "なし"
+    tr_str = "、".join(f"{r['start']}〜{r['end']}" for r in s["exclude_time_ranges"]) or "なし"
+    client.chat_postMessage(
+        channel=user_id,
+        text=f"✅ 設定を保存しました\n• 除外曜日: {wd_str}\n• 除外時間帯: {tr_str}",
+    )
 
 
 # ---------------------------------------------------------------------------
