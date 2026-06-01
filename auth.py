@@ -8,7 +8,10 @@ from pathlib import Path
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.readonly",
+]
 TOKENS_DIR = os.environ.get("TOKENS_DIR", "tokens")
 REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI") or "http://localhost:8080/oauth/callback"
 MANUAL_REDIRECT_URI = "http://localhost"
@@ -28,17 +31,20 @@ def has_valid_token(user_id: str) -> bool:
         return False
     with open(path, "rb") as f:
         creds = pickle.load(f)
-    if creds and creds.valid:
-        return True
     if creds and creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
             with open(path, "wb") as f:
                 pickle.dump(creds, f)
-            return True
         except Exception:
-            pass
-    return False
+            return False
+    if not creds or not creds.valid:
+        return False
+    # 必要なスコープがすべて付与されているか確認
+    granted = set(creds.scopes or [])
+    if not all(s in granted for s in SCOPES):
+        return False
+    return True
 
 
 def start_oauth_manual(user_id: str) -> str:
