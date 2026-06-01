@@ -83,9 +83,8 @@ def handle_schedule(ack, client, body, command):
     display_labels = {"slots": "スロット形式", "windows": "空き枠まとめ形式"}
     dur_labels = {30: "30分", 60: "1時間", 90: "1時間30分", 120: "2時間"}
     buf_labels = {0: "なし", 15: "15分", 30: "30分"}
-    client.chat_postEphemeral(
+    result = client.chat_postMessage(
         channel=channel_id,
-        user=user_id,
         text="現在の検索条件",
         blocks=[
             {
@@ -106,11 +105,12 @@ def handle_schedule(ack, client, body, command):
             }
         ],
     )
+    thread_ts = result["ts"]
 
     from modal import build_modal
     client.views_open(
         trigger_id=body["trigger_id"],
-        view=build_modal(channel_id=channel_id, user_id=user_id),
+        view=build_modal(channel_id=channel_id, user_id=user_id, thread_ts=thread_ts),
     )
 
 
@@ -192,6 +192,7 @@ def handle_mention(event, client):
                 "selected": [],
                 "channel_id": channel_id,
                 "user_id": user_id,
+                "thread_ts": thread_ts,
                 "participant_emails": s["participants"],
                 "participant_slack_ids": [],
                 "duration_minutes": s["default_duration"],
@@ -223,6 +224,7 @@ def handle_mention(event, client):
 
         except Exception as e:
             client.chat_postEphemeral(channel=channel_id, user=user_id,
+                thread_ts=thread_ts,
                 text=f"❌ エラーが発生しました: {str(e)}")
 
     threading.Thread(target=process).start()
@@ -239,6 +241,7 @@ def handle_modal_submit(ack, body, client, view):
     values = view["state"]["values"]
     metadata = json.loads(view.get("private_metadata", "{}"))
     channel_id = metadata.get("channel_id")
+    thread_ts = metadata.get("thread_ts") or None
     user_id = body["user"]["id"]
 
     duration = int(values["duration"]["value"]["selected_option"]["value"])
@@ -289,7 +292,7 @@ def handle_modal_submit(ack, body, client, view):
             )
 
             if not results:
-                client.chat_postEphemeral(channel=channel_id, user=user_id, text="❌ 条件に合う空き時間が見つかりませんでした。")
+                client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, text="❌ 条件に合う空き時間が見つかりませんでした。")
                 return
 
             # ── 直接登録モード（スロット形式のみ） ──
@@ -300,13 +303,13 @@ def handle_modal_submit(ack, body, client, view):
                 confirm = f"✅ *カレンダーに登録しました*\n• {slot_str}  <{event_url}|カレンダーで確認>"
                 if mtg_url:
                     confirm += f"  <{mtg_url}|MTGに参加>"
-                client.chat_postEphemeral(channel=channel_id, user=user_id, text=confirm)
+                client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, text=confirm)
                 mention_str = " ".join(f"<@{uid}>" for uid in raw_user_ids) if raw_user_ids else "なし"
                 ch_msg = f"📅 *{direct_title}*\n• {slot_str}  <{event_url}|カレンダーで確認>"
                 if mtg_url:
                     ch_msg += f"\n  🔗 <{mtg_url}|MTG URL>"
                 ch_msg += f"\n参加者: {mention_str}"
-                client.chat_postMessage(channel=channel_id, text=ch_msg)
+                client.chat_postMessage(channel=channel_id, thread_ts=thread_ts, text=ch_msg)
                 return
 
             # ── チェックボックス表示 ──
@@ -316,6 +319,7 @@ def handle_modal_submit(ack, body, client, view):
                 "selected": [],
                 "channel_id": channel_id,
                 "user_id": user_id,
+                "thread_ts": thread_ts,
                 "participant_emails": participants,
                 "participant_slack_ids": raw_user_ids,
                 "duration_minutes": duration,
@@ -338,10 +342,10 @@ def handle_modal_submit(ack, body, client, view):
             else:
                 blocks = build_schedule_blocks(results, session_id)
 
-            client.chat_postEphemeral(channel=channel_id, user=user_id, blocks=blocks, text="日程調整")
+            client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, blocks=blocks, text="日程調整")
 
         except Exception as e:
-            client.chat_postEphemeral(channel=channel_id, user=user_id, text=f"❌ エラー: {str(e)}")
+            client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, text=f"❌ エラー: {str(e)}")
 
     threading.Thread(target=process).start()
 
@@ -365,15 +369,17 @@ def handle_date_selected(ack, action):
 # ---------------------------------------------------------------------------
 
 @app.action("create_email")
-def handle_create_email(ack, action, respond):
+def handle_create_email(ack, action, client):
     ack()
     session = session_store.get(action["value"])
     if not session:
-        respond("⚠️ セッションが切れました。再度 `/日程調整` を実行してください。")
         return
     selected = [session["slots"][i] for i in session["selected"] if i < len(session["slots"])]
     from formatter import format_email_text
-    respond({"text": format_email_text(selected), "response_type": "ephemeral", "replace_original": False})
+    client.chat_postEphemeral(
+        channel=session["channel_id"], user=session["user_id"],
+        thread_ts=session.get("thread_ts"), text=format_email_text(selected),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -381,16 +387,18 @@ def handle_create_email(ack, action, respond):
 # ---------------------------------------------------------------------------
 
 @app.action("create_email_window")
-def handle_create_email_window(ack, action, respond):
+def handle_create_email_window(ack, action, client):
     ack()
     session = session_store.get(action["value"])
     if not session:
-        respond("⚠️ セッションが切れました。再度 `/日程調整` を実行してください。")
         return
     selected = [session["slots"][i] for i in session["selected"] if i < len(session["slots"])]
     duration = session.get("duration_minutes", 60)
     from formatter import format_email_windows
-    respond({"text": format_email_windows(selected, duration), "response_type": "ephemeral", "replace_original": False})
+    client.chat_postEphemeral(
+        channel=session["channel_id"], user=session["user_id"],
+        thread_ts=session.get("thread_ts"), text=format_email_windows(selected, duration),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +443,7 @@ def handle_event_modal_submit(ack, body, client, view):
 
     selected = [session["slots"][i] for i in session["selected"] if i < len(session["slots"])]
     channel_id = session.get("channel_id")
+    thread_ts = session.get("thread_ts")
     attendees = session.get("participant_emails", [])
     participant_slack_ids = session.get("participant_slack_ids", [])
 
@@ -454,9 +463,9 @@ def handle_event_modal_submit(ack, body, client, view):
                 if mtg_url:
                     line += f"  <{mtg_url}|MTGに参加>"
                 confirm_lines.append(line)
-            client.chat_postEphemeral(channel=channel_id, user=user_id, text="\n".join(confirm_lines))
+            client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, text="\n".join(confirm_lines))
 
-            # チャンネルにMTG情報を投稿
+            # スレッドにMTG情報を投稿
             mention_str = " ".join(f"<@{uid}>" for uid in participant_slack_ids) if participant_slack_ids else "なし"
             thread_lines = [f"📅 *{event_title}*"]
             for start, end, event_url, mtg_url in created:
@@ -464,10 +473,10 @@ def handle_event_modal_submit(ack, body, client, view):
                 if mtg_url:
                     thread_lines.append(f"  🔗 <{mtg_url}|MTG URL>")
             thread_lines.append(f"参加者: {mention_str}")
-            client.chat_postMessage(channel=channel_id, text="\n".join(thread_lines))
+            client.chat_postMessage(channel=channel_id, thread_ts=thread_ts, text="\n".join(thread_lines))
 
         except Exception as e:
-            client.chat_postEphemeral(channel=channel_id, user=user_id, text=f"❌ イベント作成に失敗しました: {str(e)}")
+            client.chat_postEphemeral(channel=channel_id, user=user_id, thread_ts=thread_ts, text=f"❌ イベント作成に失敗しました: {str(e)}")
 
     threading.Thread(target=process).start()
 
@@ -477,14 +486,16 @@ def handle_event_modal_submit(ack, body, client, view):
 # ---------------------------------------------------------------------------
 
 @app.action("show_all")
-def handle_show_all(ack, action, respond):
+def handle_show_all(ack, action, client):
     ack()
     session = session_store.get(action["value"])
     if not session:
-        respond("⚠️ セッションが切れました。再度 `/日程調整` を実行してください。")
         return
     from formatter import format_all_text
-    respond({"text": format_all_text(session["slots"]), "response_type": "ephemeral", "replace_original": False})
+    client.chat_postEphemeral(
+        channel=session["channel_id"], user=session["user_id"],
+        thread_ts=session.get("thread_ts"), text=format_all_text(session["slots"]),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -500,7 +511,7 @@ def handle_reopen_modal(ack, action, body, client):
     from modal import build_modal
     client.views_open(
         trigger_id=body["trigger_id"],
-        view=build_modal(channel_id=session["channel_id"], user_id=session["user_id"]),
+        view=build_modal(channel_id=session["channel_id"], user_id=session["user_id"], thread_ts=session.get("thread_ts", "")),
     )
 
 
@@ -509,15 +520,17 @@ def handle_reopen_modal(ack, action, body, client):
 # ---------------------------------------------------------------------------
 
 @app.action("save_as_default")
-def handle_save_as_default(ack, action, respond):
+def handle_save_as_default(ack, action, client):
     ack()
     session = session_store.get(action["value"])
     if not session:
-        respond("⚠️ セッションが切れました。")
         return
-    user_id = session.get("user_id")
-    cfg.save_modal_defaults(user_id, session.get("modal_values", {}))
-    respond({"text": "✅ この条件をデフォルトとして保存しました。次回から自動で反映されます。", "response_type": "ephemeral", "replace_original": False})
+    cfg.save_modal_defaults(session["user_id"], session.get("modal_values", {}))
+    client.chat_postEphemeral(
+        channel=session["channel_id"], user=session["user_id"],
+        thread_ts=session.get("thread_ts"),
+        text="✅ この条件をデフォルトとして保存しました。次回から自動で反映されます。",
+    )
 
 
 # ---------------------------------------------------------------------------

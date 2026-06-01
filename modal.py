@@ -255,9 +255,9 @@ def build_event_modal(session_id: str, slots: list) -> dict:
     }
 
 
-def build_modal(channel_id: str, user_id: str) -> dict:
+def build_modal(channel_id: str, user_id: str, thread_ts: str = "") -> dict:
     s = cfg.load(user_id)
-    metadata = json.dumps({"channel_id": channel_id, "user_id": user_id})
+    metadata = json.dumps({"channel_id": channel_id, "user_id": user_id, "thread_ts": thread_ts})
     saved_display = s.get("display_mode", "slots")
 
     return {
