@@ -59,7 +59,7 @@ def build_settings_modal(user_id: str) -> dict:
     filter_opts = [
         {
             "text": {"type": "plain_text", "text": "指定キーワードのみ除外"},
-            "description": {"type": "plain_text", "text": "商談・MTG・有給など指定した単語を含む予定だけをブロック。「商談準備」など除外ワードを含む場合は空きとして扱う"},
+            "description": {"type": "plain_text", "text": "商談・MTG・有給・移動など指定した単語を含む予定だけをブロック。「商談準備」など除外ワードを含む場合は空きとして扱う"},
             "value": "keywords",
         },
         {
@@ -403,13 +403,13 @@ def build_modal(channel_id: str, user_id: str, thread_ts: str = "") -> dict:
                     "action_id": "value",
                     "initial_option": {
                         "text": {"type": "plain_text", "text": "指定キーワードのみ除外"},
-                        "description": {"type": "plain_text", "text": "商談・面談・面接・MTG・ブロック・有給・午前休・午後休 を含む予定"},
+                        "description": {"type": "plain_text", "text": "商談・面談・面接・MTG・ブロック・有給・午前休・午後休・移動 を含む予定"},
                         "value": "keywords",
                     },
                     "options": [
                         {
                             "text": {"type": "plain_text", "text": "指定キーワードのみ除外"},
-                            "description": {"type": "plain_text", "text": "商談・面談・面接・MTG・ブロック・有給・午前休・午後休 を含む予定"},
+                            "description": {"type": "plain_text", "text": "商談・面談・面接・MTG・ブロック・有給・午前休・午後休・移動 を含む予定"},
                             "value": "keywords",
                         },
                         {

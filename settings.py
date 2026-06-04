@@ -19,7 +19,7 @@ DEFAULT: dict = {
     "block_keywords": [
         "商談", "面談", "面接", "MTG", "mtg", "ミーティング", "会議",
         "打合せ", "打ち合わせ", "sync", "Sync", "interview", "Interview",
-        "ブロック", "有給", "午前休", "午後休",
+        "ブロック", "有給", "午前休", "午後休", "移動",
     ],
     "ignore_keywords": ["準備", "前準備"],
     "filter_mode": "all",
