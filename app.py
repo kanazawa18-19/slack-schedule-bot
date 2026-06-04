@@ -17,8 +17,8 @@ app = App(token=os.environ["SLACK_BOT_TOKEN"])
 session_store: dict = {}
 
 
-def _build_settings_diff(old: dict, modal_values: dict) -> str:
-    """oldと modal_values を比較して変更行を返す。変更なしなら空文字。"""
+def _build_settings_summary(old: dict, modal_values: dict) -> str:
+    """全検索条件を出力する。デフォルトから変わった項目は ✏️ を付ける。"""
     dur_labels = {30: "30分", 60: "1時間", 90: "1時間30分", 120: "2時間"}
     buf_labels = {0: "なし", 15: "15分", 30: "30分"}
     filter_labels = {"keywords": "キーワード除外", "all": "全予定除外", "none": "除外なし"}
@@ -29,29 +29,29 @@ def _build_settings_diff(old: dict, modal_values: dict) -> str:
 
     mv = modal_values
     checks = [
-        ("default_duration",      mv.get("duration"),         "所要時間",   lambda v: dur_labels.get(v, f"{v}分")),
-        ("default_start_time",    mv.get("start_time"),       "開始時間",   lambda v: v),
-        ("default_end_time",      mv.get("end_time"),         "終了時間",   lambda v: v),
-        ("default_slot_interval", mv.get("slot_interval"),    "刻み",       lambda v: f"{v}分"),
-        ("buffer_minutes",        mv.get("buffer_minutes"),   "バッファ",   lambda v: buf_labels.get(v, f"{v}分")),
-        ("default_weeks_ahead",   mv.get("weeks_ahead"),      "検索期間",   lambda v: f"{v}週間"),
-        ("filter_mode",           mv.get("filter_mode"),      "除外モード", lambda v: filter_labels.get(v, v)),
-        ("display_mode",          mv.get("display_mode"),     "表示形式",   lambda v: display_labels.get(v, v)),
-        ("exclude_weekdays",      mv.get("exclude_weekdays"), "除外曜日",   fmt_wd),
+        ("default_duration",      mv.get("duration"),            "所要時間",   lambda v: dur_labels.get(v, f"{v}分")),
+        ("default_start_time",    mv.get("start_time"),          "開始時間",   lambda v: v),
+        ("default_end_time",      mv.get("end_time"),            "終了時間",   lambda v: v),
+        ("default_slot_interval", mv.get("slot_interval"),       "刻み",       lambda v: f"{v}分"),
+        ("buffer_minutes",        mv.get("buffer_minutes"),      "バッファ",   lambda v: buf_labels.get(v, f"{v}分")),
+        ("default_weeks_ahead",   mv.get("weeks_ahead"),         "検索期間",   lambda v: f"{v}週間"),
+        ("filter_mode",           mv.get("filter_mode"),         "除外モード", lambda v: filter_labels.get(v, v)),
+        ("display_mode",          mv.get("display_mode"),        "表示形式",   lambda v: display_labels.get(v, v)),
+        ("exclude_weekdays",      mv.get("exclude_weekdays"),    "除外曜日",   fmt_wd),
         ("exclude_time_ranges",   mv.get("exclude_time_ranges"), "除外時間帯", fmt_tr),
     ]
     lines = []
     for key, new_val, label, fmt in checks:
         if new_val is None:
             continue
-        old_val = old.get(key)
-        if old_val != new_val:
-            lines.append(f"• {label}: {fmt(old_val)} → {fmt(new_val)}")
+        changed = old.get(key) != new_val
+        marker = " ✏️" if changed else ""
+        lines.append(f"• {label}: {fmt(new_val)}{marker}")
 
     participant_ids = mv.get("participant_slack_ids") or []
     if participant_ids:
         mentions = " ".join(f"<@{uid}>" for uid in participant_ids)
-        lines.append(f"• 参加者（追加）: {mentions}")
+        lines.append(f"• 参加者（追加）: {mentions} ✏️")
 
     return "\n".join(lines)
 
@@ -397,12 +397,11 @@ def handle_modal_submit(ack, body, client, view):
                 },
             }
 
-            diff = _build_settings_diff(s, session_store[session_id]["modal_values"])
-            if diff:
-                client.chat_postEphemeral(
-                    channel=channel_id, user=user_id, thread_ts=thread_ts,
-                    text="⚙️ *デフォルトから変更した条件*\n" + diff,
-                )
+            summary = _build_settings_summary(s, session_store[session_id]["modal_values"])
+            client.chat_postEphemeral(
+                channel=channel_id, user=user_id, thread_ts=thread_ts,
+                text="⚙️ *今回の検索条件*（✏️ はデフォルトから変更）\n" + summary,
+            )
 
             if use_windows:
                 from formatter import build_windows_blocks
@@ -599,8 +598,8 @@ def handle_save_as_default(ack, action, client):
     old = cfg.load(user_id)
     cfg.save_modal_defaults(user_id, modal_values)
 
-    diff = _build_settings_diff(old, modal_values)
-    text = "✅ この条件をデフォルトとして保存しました\n" + diff if diff else "✅ この条件をデフォルトとして保存しました（変更なし）"
+    summary = _build_settings_summary(old, modal_values)
+    text = "✅ この条件をデフォルトとして保存しました（✏️ はデフォルトから変更）\n" + summary
 
     client.chat_postEphemeral(
         channel=session["channel_id"], user=user_id,
@@ -668,39 +667,24 @@ def handle_settings_modal_submit(ack, body, client, view):
 
     cfg.save(user_id, s)
 
-    weekday_names = ["月", "火", "水", "木", "金"]
-    dur_labels = {30: "30分", 60: "1時間", 90: "1時間30分", 120: "2時間"}
-    buf_labels = {0: "なし", 15: "15分", 30: "30分"}
-    filter_labels = {"keywords": "キーワード除外", "all": "全予定除外", "none": "除外なし"}
-    display_labels = {"slots": "スロット形式", "windows": "空き枠まとめ形式"}
-
-    def fmt_wd(days): return "、".join(weekday_names[d] + "曜" for d in days) or "なし"
-    def fmt_tr(ranges): return "、".join(f"{r['start']}〜{r['end']}" for r in ranges) or "なし"
-
-    diff_items = []
-    checks = [
-        ("default_duration",    "所要時間",   lambda v: dur_labels.get(v, f"{v}分")),
-        ("default_start_time",  "開始時間",   lambda v: v),
-        ("default_end_time",    "終了時間",   lambda v: v),
-        ("default_slot_interval", "刻み",     lambda v: f"{v}分"),
-        ("buffer_minutes",      "バッファ",   lambda v: buf_labels.get(v, f"{v}分")),
-        ("default_weeks_ahead", "検索期間",   lambda v: f"{v}週間"),
-        ("filter_mode",         "除外モード", lambda v: filter_labels.get(v, v)),
-        ("display_mode",        "表示形式",   lambda v: display_labels.get(v, v)),
-        ("exclude_weekdays",    "除外曜日",   fmt_wd),
-        ("exclude_time_ranges", "除外時間帯", fmt_tr),
-    ]
-    for key, label, fmt in checks:
-        o, n = old.get(key), s.get(key)
-        if o != n:
-            diff_items.append(f"• {label}: {fmt(o)} → {fmt(n)}")
-
-    if diff_items:
-        text = "✅ 設定を保存しました\n" + "\n".join(diff_items)
-    else:
-        text = "✅ 設定を保存しました（変更なし）"
-
-    client.chat_postMessage(channel=user_id, text=text)
+    # s のキーを modal_values 形式に変換して共通ヘルパーで全件表示
+    modal_values = {
+        "duration": s["default_duration"],
+        "start_time": s["default_start_time"],
+        "end_time": s["default_end_time"],
+        "slot_interval": s["default_slot_interval"],
+        "buffer_minutes": s["buffer_minutes"],
+        "weeks_ahead": s["default_weeks_ahead"],
+        "filter_mode": s["filter_mode"],
+        "display_mode": s["display_mode"],
+        "exclude_weekdays": s["exclude_weekdays"],
+        "exclude_time_ranges": s["exclude_time_ranges"],
+    }
+    summary = _build_settings_summary(old, modal_values)
+    client.chat_postMessage(
+        channel=user_id,
+        text="✅ 設定を保存しました（✏️ は変更した項目）\n" + summary,
+    )
 
 
 # ---------------------------------------------------------------------------
