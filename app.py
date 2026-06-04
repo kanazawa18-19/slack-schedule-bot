@@ -47,6 +47,12 @@ def _build_settings_diff(old: dict, modal_values: dict) -> str:
         old_val = old.get(key)
         if old_val != new_val:
             lines.append(f"• {label}: {fmt(old_val)} → {fmt(new_val)}")
+
+    participant_ids = mv.get("participant_slack_ids") or []
+    if participant_ids:
+        mentions = " ".join(f"<@{uid}>" for uid in participant_ids)
+        lines.append(f"• 参加者（追加）: {mentions}")
+
     return "\n".join(lines)
 
 
@@ -387,6 +393,7 @@ def handle_modal_submit(ack, body, client, view):
                     "display_mode": display_mode,
                     "exclude_weekdays": exclude_weekdays_modal,
                     "exclude_time_ranges": exclude_time_ranges_modal,
+                    "participant_slack_ids": raw_user_ids,
                 },
             }
 
